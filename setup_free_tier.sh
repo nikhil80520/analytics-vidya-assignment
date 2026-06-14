@@ -21,8 +21,6 @@ unzip -q awscliv2.zip
 sudo ./aws/install
 rm -rf aws awscliv2.zip
 
-# Install Nginx (lightweight reverse proxy)
-sudo apt install -y nginx
 
 # Create swap file (t2.micro has only 1GB RAM)
 sudo fallocate -l 1G /swapfile
