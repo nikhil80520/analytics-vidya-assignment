@@ -25,7 +25,7 @@ rm -rf aws awscliv2.zip
 sudo apt install -y nginx
 
 # Create swap file (t2.micro has only 1GB RAM)
-sudo fallocate -l 2G /swapfile
+sudo fallocate -l 1G /swapfile
 sudo chmod 600 /swapfile
 sudo mkswap /swapfile
 sudo swapon /swapfile
