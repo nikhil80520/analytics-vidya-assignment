@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: python-qa-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Force Python to not buffer stdout
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    # t2.micro limits
+    deploy:
+      resources:
+        limits:
+          memory: 900M
+          cpus: '1.0'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  nginx:
+    image: nginx:alpine
+    container_name: python-qa-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./infrastructure/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
