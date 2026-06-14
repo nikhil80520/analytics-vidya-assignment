@@ -89,13 +89,28 @@ class PineconeManager:
         embeddings = bedrock_manager.get_embeddings()
         vectorstore = self.get_vectorstore()
         
-        # Upload in batches (Pinecone free tier: 100 vectors/batch)
-        print(f"☁️  Uploading to Pinecone in batches of {batch_size}...")
-        for i in range(0, len(chunks), batch_size):
-            batch = chunks[i:i + batch_size]
-            vectorstore.add_documents(batch)
-            print(f"  ✅ Uploaded batch {i//batch_size + 1}/{(len(chunks)-1)//batch_size + 1}")
-            time.sleep(0.5)  # Rate limiting for free tier
+        # Upload in parallel batches using ThreadPoolExecutor
+        print(f"☁️  Uploading to Pinecone in parallel batches of {batch_size}...")
+        
+        batches = [chunks[i:i + batch_size] for i in range(0, len(chunks), batch_size)]
+        
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from tqdm import tqdm
+        import time
+
+        with tqdm(total=len(batches), desc="Uploading Batches") as pbar:
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                # Submit all batches
+                futures = {executor.submit(vectorstore.add_documents, batch): batch for batch in batches}
+                
+                for future in as_completed(futures):
+                    try:
+                        future.result()
+                    except Exception as exc:
+                        print(f"Batch generated an exception: {exc}")
+                    
+                    pbar.update(1)
+                    time.sleep(0.1) # Small delay to prevent hitting Bedrock limits too hard
         
         print(f"🎉 Successfully uploaded {len(chunks):,} vectors to Pinecone!")
     

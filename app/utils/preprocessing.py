@@ -34,10 +34,17 @@ def preprocess_stackoverflow_data(questions_path: str, answers_path: str, tags_p
     
     # Merge
     merged = pd.merge(df_q, top_answers, left_on='Id', right_on='ParentId', suffixes=('_q', '_a'))
-    merged = pd.merge(merged, tags_grouped, on='Id', how='left')
+    # After suffixes, Questions.Id is now 'Id_q'. Merge tags on that column.
+    merged = pd.merge(merged, tags_grouped, left_on='Id_q', right_on='Id', how='left')
+    # Keep a clean 'Id' column for downstream use
+    merged['Id'] = merged['Id_q']
 
     # Optional: Filter out negative scoring questions/answers to ensure quality
     merged = merged[(merged['Score_q'] > 0) & (merged['Score_a'] > 0)]
+    
+    # SORT by Score_q and LIMIT to top 1000 to prevent massive upload times
+    print(f"Total questions available: {len(merged)}. Limiting to top 1000 for faster processing...")
+    merged = merged.sort_values(by='Score_q', ascending=False).head(1000)
     
     print(f"Creating documents for {len(merged)} records...")
     documents = []

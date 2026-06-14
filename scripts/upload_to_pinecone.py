@@ -17,58 +17,50 @@ from app.config import get_settings
 def download_and_upload_kaggle_to_s3(s3_bucket: str):
     s3_client = boto3.client('s3')
     files_to_check = ['Questions.csv', 'Answers.csv', 'Tags.csv']
+    print("⬆️ Checking and uploading missing local datasets to S3...")
+    download_path = "app/data/raw"
     
-    # Check if files already exist
-    all_exist = True
+    import threading
+    from tqdm import tqdm
+
+    class ProgressPercentage(object):
+        def __init__(self, filename):
+            self._filename = filename
+            self._size = float(os.path.getsize(filename))
+            self._seen_so_far = 0
+            self._lock = threading.Lock()
+            self._pbar = tqdm(total=self._size, unit='B', unit_scale=True, desc=os.path.basename(filename))
+
+        def __call__(self, bytes_amount):
+            with self._lock:
+                self._seen_so_far += bytes_amount
+                self._pbar.update(bytes_amount)
+                if self._seen_so_far >= self._size:
+                    self._pbar.close()
+    
     for file in files_to_check:
         try:
             s3_client.head_object(Bucket=s3_bucket, Key=file)
-            print(f"✅ {file} already exists in S3.")
+            print(f"✅ {file} already exists in S3. Skipping upload.")
+            continue # Skip this file!
         except Exception:
-            all_exist = False
-            break
-            
-    if all_exist:
-        print("✅ All raw files exist in S3. Skipping Kaggle download.")
-        return
-        
-    print("⬇️ Downloading dataset from Kaggle...")
-    settings = get_settings()
-    if not settings.KAGGLE_USERNAME or not settings.KAGGLE_KEY:
-        print("❌ KAGGLE_USERNAME and KAGGLE_KEY must be set in .env to download data.")
-        sys.exit(1)
-        
-    os.environ['KAGGLE_USERNAME'] = settings.KAGGLE_USERNAME
-    os.environ['KAGGLE_KEY'] = settings.KAGGLE_KEY
-    
-    from kaggle.api.kaggle_api_extended import KaggleApi
-    api = KaggleApi()
-    api.authenticate()
-    
-    dataset = "stackoverflow/pythonquestions"
-    download_path = "app/data/raw"
-    os.makedirs(download_path, exist_ok=True)
-    
-    api.dataset_download_files(dataset, path=download_path, unzip=True)
-    print("✅ Download and extraction complete.")
-    
-    print("☁️ Uploading raw files to S3...")
-    for file in files_to_check:
+            pass # File is missing, proceed to upload
+
         local_path = os.path.join(download_path, file)
         if os.path.exists(local_path):
-            file_size = os.path.getsize(local_path)
-            print(f"   Uploading {file} ({file_size / (1024*1024):.2f} MB) to s3://{s3_bucket}/{file}...")
-            
-            with tqdm(total=file_size, unit='B', unit_scale=True, desc=file) as pbar:
-                s3_client.upload_file(
-                    local_path, 
-                    s3_bucket, 
-                    file,
-                    Callback=lambda bytes_transferred: pbar.update(bytes_transferred)
-                )
-            os.remove(local_path)
+            print(f"📦 Uploading {file} to S3...")
+            s3_client.upload_file(
+                local_path, 
+                s3_bucket, 
+                file,
+                Callback=ProgressPercentage(local_path)
+            )
+            print(f"   ✅ Uploaded {file} to s3://{s3_bucket}/{file}.")
         else:
-            print(f"⚠️ Warning: {file} not found in downloaded data.")
+            print(f"❌ Error: Local file not found: {local_path}")
+            sys.exit(1)
+            
+    print("✅ Upload to S3 complete.")
 
 
 def main():
@@ -94,11 +86,11 @@ def main():
     docs = load_processed_documents(s3_bucket)
     
     if not docs:
-        print("🔄 Preprocessing raw data from S3...")
+        print("🔄 Preprocessing raw data from LOCAL files (much faster than S3)...")
         docs = preprocess_stackoverflow_data(
-            questions_path=f"s3://{s3_bucket}/Questions.csv",
-            answers_path=f"s3://{s3_bucket}/Answers.csv",
-            tags_path=f"s3://{s3_bucket}/Tags.csv",
+            questions_path="app/data/raw/Questions.csv",
+            answers_path="app/data/raw/Answers.csv",
+            tags_path="app/data/raw/Tags.csv",
             s3_bucket=s3_bucket
         )
     

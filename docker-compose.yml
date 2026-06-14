@@ -19,11 +19,28 @@ services:
           memory: 900M
           cpus: '1.0'
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
+
+  streamlit:
+    build: .
+    container_name: python-qa-streamlit
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://app:8000
+      - PYTHONUNBUFFERED=1
+    command: ["streamlit", "run", "frontend/app.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true"]
+    depends_on:
+      - app
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   nginx:
     image: nginx:alpine
@@ -34,6 +51,7 @@ services:
       - ./infrastructure/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - app
+      - streamlit
     restart: unless-stopped
     deploy:
       resources:

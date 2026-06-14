@@ -4,21 +4,32 @@ This project is an AI-powered Python Q&A system built for the Analytics Vidhya A
 
 ## Architecture
 
-The system is optimized to run entirely on **Free Tier** cloud services:
+The system is optimized to run on **Free Tier** cloud services with a modern UI:
+- **Frontend UI**: Streamlit (Chat Interface)
+- **Backend API**: FastAPI
 - **Vector Database**: Pinecone Cloud (Free Tier)
 - **LLM & Embeddings**: AWS Bedrock (Qwen via Amazon Bedrock / Titan Text Embeddings v2)
-- **Deployment**: AWS EC2 `t2.micro` (Free Tier)
-- **Backend API**: FastAPI
+- **Deployment**: AWS EC2 `t2.micro` via Docker Compose
 
-```text
-User → Nginx (EC2 t2.micro) → FastAPI → Pinecone (free) → AWS Bedrock Qwen/Titan
+```mermaid
+graph LR
+    A[User] -->|Interacts| F[Streamlit UI]
+    F -->|POST /ask| B[Nginx Reverse Proxy]
+    B --> C[FastAPI Server]
+    C -->|1. Query| D[Pinecone Vector Store]
+    D -->|2. Context| C
+    C -->|3. Prompt| E[AWS Bedrock LLM]
+    E -->|4. Answer| C
+    C -->|5. Response| F
 ```
 
 ## Features
 
+- **Interactive UI**: A fully functional ChatGPT-like Streamlit frontend to interact with the API.
 - **RAG Pipeline**: Leverages LangChain with a Pinecone vector store for fast, accurate retrieval.
 - **FastAPI Backend**: Exposes a POST `/ask` endpoint for questions and a GET `/health` endpoint for monitoring.
-- **Dockerized**: Containerized for easy deployment, optimized for the `t2.micro` memory constraints.
+- **Parallel Data Ingestion**: The `upload_to_pinecone.py` script utilizes `ThreadPoolExecutor` and `tqdm` to parallelize data chunking and vector uploads, drastically reducing setup time.
+- **Dockerized**: Containerized for easy deployment, carefully balanced across three containers (`app`, `streamlit`, `nginx`) to fit within the `t2.micro` 1GB memory constraints.
 
 ---
 
@@ -33,7 +44,11 @@ User → Nginx (EC2 t2.micro) → FastAPI → Pinecone (free) → AWS Bedrock Qw
 2. **Set up a Virtual Environment**:
    ```bash
    python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   # On Windows:
+   venv\Scripts\activate
+   # On Mac/Linux:
+   source venv/bin/activate
+   
    pip install -r requirements.txt
    ```
 
@@ -45,18 +60,21 @@ User → Nginx (EC2 t2.micro) → FastAPI → Pinecone (free) → AWS Bedrock Qw
    *Required variables*: AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`), Pinecone credentials (`PINECONE_API_KEY`).
 
 4. **Prepare the Data**:
-   Download the [Stack Overflow dataset from Kaggle](https://www.kaggle.com/datasets/stackoverflow/pythonquestions) and upload `Questions.csv`, `Answers.csv`, and `Tags.csv` to an Amazon S3 bucket. Ensure your AWS credentials have read access to this bucket. Add the bucket name to your `.env` file as `AWS_S3_BUCKET_NAME`.
+   Download the [Stack Overflow dataset from Kaggle](https://www.kaggle.com/datasets/stackoverflow/pythonquestions) and place `Questions.csv`, `Answers.csv`, and `Tags.csv` inside `app/data/raw/`.
 
-5. **Upload to Pinecone**:
-   Run the data ingestion script to build your vector index in the cloud.
+5. **Upload to Pinecone & S3**:
+   Run the data ingestion script to build your vector index in the cloud. This script has been optimized with parallel processing and progress bars.
    ```bash
    python scripts/upload_to_pinecone.py
    ```
 
-6. **Run the API locally**:
+6. **Run the Application Locally (via Docker)**:
    ```bash
-   uvicorn app.main:app --reload
+   docker-compose up -d --build
    ```
+   - **Frontend UI**: http://localhost:8501
+   - **Backend API**: http://localhost:8000
+   - **API Docs (Swagger)**: http://localhost:8000/docs
 
 ---
 
@@ -64,12 +82,11 @@ User → Nginx (EC2 t2.micro) → FastAPI → Pinecone (free) → AWS Bedrock Qw
 
 1. **Launch a Free Tier EC2 Instance**:
    - Ubuntu Server 22.04 LTS (t2.micro)
-   - Ensure Security Group allows HTTP (80) and SSH (22).
+   - Ensure Security Group allows HTTP (80), API (8000), and Streamlit (8501), plus SSH (22).
 
 2. **Transfer Code to EC2**:
-   *You don't need to copy the dataset or vector database since vectors are in Pinecone!*
    ```bash
-   scp -i your-key.pem -r app/ infrastructure/ docker-compose.yml Dockerfile requirements.txt .env setup_free_tier.sh ubuntu@<ec2-public-ip>:~/python-qa-aws/
+   scp -i your-key.pem -r app/ frontend/ infrastructure/ docker-compose.yml Dockerfile requirements.txt .env setup_free_tier.sh ubuntu@<ec2-public-ip>:~/python-qa-aws/
    ```
 
 3. **SSH and Setup**:
@@ -85,17 +102,16 @@ User → Nginx (EC2 t2.micro) → FastAPI → Pinecone (free) → AWS Bedrock Qw
    docker-compose up -d --build
    ```
 
-The application will be live at `http://<ec2-public-ip>`.
+The application UI will be live at `http://<ec2-public-ip>:8501`.
 
 ---
 
 ## 🧪 Testing
 
-A simulated test notebook/script is provided. To run real API testing once deployed, you can use:
+You can test the API directly using curl or Swagger UI (`/docs`), or interact with the user-friendly Streamlit Frontend (`:8501`).
+
 ```bash
-curl -X POST "http://<your-ec2-ip>/ask" \
+curl -X POST "http://<your-ec2-ip>:8000/ask" \
      -H "Content-Type: application/json" \
      -d '{"question": "How do I reverse a list in Python?"}'
 ```
-
-See `test_results.md` for a documented set of diverse queries, expected responses, and failure case observations.

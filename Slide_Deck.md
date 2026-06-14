@@ -1,13 +1,17 @@
-# Slide Deck: AI Engineer Assessment - Python Q&A Assistant
+---
+marp: true
+theme: default
+paginate: true
+---
 
-*(This markdown file represents the content of the presentation slide deck)*
+# Slide Deck: AI Engineer Assessment - Python Q&A Assistant
 
 ---
 
 ## Slide 1: Title
 **Python Programming Q&A Assistant**
 *Analytics Vidhya AI Engineer Assessment*
-*Candidate: [Your Name]*
+*Candidate: Nikhil Kumar*
 
 ---
 
@@ -15,7 +19,7 @@
 **Goal:** Build an AI-powered Python Q&A system for data science learners.
 **Requirements:**
 - Grounded answers using Stack Overflow data.
-- Publicly accessible REST API.
+- Publicly accessible REST API with a User Interface.
 - FastAPI backend framework.
 - Robust RAG pipeline.
 
@@ -23,6 +27,7 @@
 
 ## Slide 3: Architecture Overview
 **Free-Tier Optimized Cloud Setup:**
+- **Frontend UI:** Streamlit (Chat Interface)
 - **Frontend/Proxy:** Nginx (Reverse proxy & timeouts)
 - **API Backend:** FastAPI running via Uvicorn/Gunicorn
 - **Vector Database:** Pinecone Cloud (Serverless, Free Tier)
@@ -35,31 +40,31 @@
 ## Slide 4: Architecture Diagram
 ```mermaid
 graph LR
-    A[User] -->|POST /ask| B[Nginx Reverse Proxy]
+    A[User] -->|Interacts| F[Streamlit UI]
+    F -->|POST /ask| B[Nginx Reverse Proxy]
     B --> C[FastAPI Server]
     C -->|1. Query| D[Pinecone Vector Store]
-    D -->|2. Context (Docs)| C
-    C -->|3. Prompt + Context| E[AWS Bedrock LLM]
-    E -->|4. Grounded Answer| C
-    C -->|5. JSON Response| A
+    D -->|2. Context| C
+    C -->|3. Prompt| E[AWS Bedrock LLM]
+    E -->|4. Answer| C
+    C -->|5. Response| F
 ```
 
 ---
 
 ## Slide 5: Data Ingestion Pipeline
 **Processing the Kaggle Dataset:**
-1. **Merge:** Combine `Questions.csv`, `Answers.csv`, and `Tags.csv`.
-2. **Filter:** Select only the top-scoring answer for each question.
-3. **Chunking:** LangChain's `RecursiveCharacterTextSplitter` (Size 1000, Overlap 200).
-4. **Embedding:** AWS Titan (1024 dimensions).
-5. **Upsert:** Batched uploads to Pinecone (limit 100 vectors/batch for free tier).
+1. **Merge & Limit:** Combine `Questions.csv`, `Answers.csv`, and `Tags.csv`. Filter to the top 1,000 highest scoring QA pairs to maximize quality.
+2. **Chunking:** LangChain's `RecursiveCharacterTextSplitter` (Size 1000, Overlap 200).
+3. **Embedding:** AWS Titan (1024 dimensions).
+4. **Parallel Upsert:** Highly optimized parallel batch uploads to Pinecone using `ThreadPoolExecutor` and `tqdm` for real-time progress tracking.
 
 ---
 
 ## Slide 6: Key Design Decisions
-- **Cloud Vector DB over Local FAISS:** Saves memory on the EC2 instance, enabling the use of a `t2.micro` (1GB RAM) instead of requiring a larger instance.
-- **AWS Bedrock:** Managed LLM service reduces infrastructure overhead and prevents Out-Of-Memory (OOM) errors on the small server.
-- **FastAPI + Gunicorn:** High performance, asynchronous request handling, bounded to 1 worker to respect memory limits.
+- **Streamlit Integration:** Gives users a tangible, "ChatGPT-like" experience over a raw API.
+- **Cloud Vector DB over Local FAISS:** Saves memory on the EC2 instance, enabling the use of a `t2.micro` (1GB RAM).
+- **Docker Compose limits:** Finely tuned memory constraints across the 3 containers (`app`, `nginx`, `streamlit`) to prevent Out-Of-Memory (OOM) errors.
 
 ---
 
@@ -90,8 +95,8 @@ graph LR
 ---
 
 ## Slide 10: Conclusion & Next Steps
-**Summary:** We successfully built a highly optimized, free-tier compatible RAG application.
+**Summary:** We successfully built a highly optimized, full-stack RAG application with an interactive UI.
 **Next Steps:**
 - Implement semantic caching.
-- Add user feedback endpoints (thumbs up/down) to fine-tune retrieval.
+- Add user feedback endpoints (thumbs up/down) in Streamlit to fine-tune retrieval.
 - Expand dataset to include official Python documentation.
