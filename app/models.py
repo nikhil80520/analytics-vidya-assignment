@@ -17,6 +17,7 @@ class QuestionResponse(BaseModel):
     answer: str
     sources: List[Source]
     retrieved_chunks: int
+    reranker: str = "none"
     vector_db: str
     llm_used: str
     embedding_model: str
