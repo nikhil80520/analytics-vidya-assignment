@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+.pytest_cache/
+.env
+*.pem
+deploy.tar.gz
+.git/
+.github/
+README.md
+Slide_Deck.md
+test_results.md
+app/data/raw/
