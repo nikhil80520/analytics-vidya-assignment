@@ -26,9 +26,10 @@ graph LR
 ## Features
 
 - **Interactive UI**: A fully functional ChatGPT-like Streamlit frontend to interact with the API.
-- **RAG Pipeline**: Leverages LangChain with a Pinecone vector store for fast, accurate retrieval.
+- **RAG Pipeline with BM25 Reranking**: Hybrid retrieval — Pinecone semantic search followed by BM25 keyword reranking for higher-quality context.
 - **FastAPI Backend**: Exposes a POST `/ask` endpoint for questions and a GET `/health` endpoint for monitoring.
 - **Parallel Data Ingestion**: The `upload_to_pinecone.py` script utilizes `ThreadPoolExecutor` and `tqdm` to parallelize data chunking and vector uploads, drastically reducing setup time.
+- **CI/CD Pipeline**: GitHub Actions workflow (`.github/workflows/deploy.yml`) auto-deploys to EC2 on every push to `main` — copies code via SCP, injects secrets, and rebuilds Docker containers.
 - **Dockerized**: Containerized for easy deployment, carefully balanced across three containers (`app`, `streamlit`, `nginx`) to fit within the `t2.micro` 1GB memory constraints.
 
 ---
