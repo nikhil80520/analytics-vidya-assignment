@@ -47,4 +47,4 @@ jobs:
           echo "BEDROCK_EMBEDDING_MODEL_ID=amazon.titan-embed-text-v2:0" >> .env
           
           # Build and start Docker containers
-          sudo docker-compose up -d --build
+          sudo docker compose up -d --build
